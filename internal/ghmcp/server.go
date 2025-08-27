@@ -12,8 +12,10 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/github/github-mcp-server/pkg/errors"
+	"github.com/github/github-mcp-server/pkg/ghapi"
 	"github.com/github/github-mcp-server/pkg/github"
 	mcplog "github.com/github/github-mcp-server/pkg/log"
 	"github.com/github/github-mcp-server/pkg/raw"
@@ -60,21 +62,31 @@ func NewMCPServer(cfg MCPServerConfig) (*server.MCPServer, error) {
 		return nil, fmt.Errorf("failed to parse API host: %w", err)
 	}
 
-	// Construct our REST client
-	restClient := gogithub.NewClient(nil).WithAuthToken(cfg.Token)
-	restClient.UserAgent = fmt.Sprintf("github-mcp-server/%s", cfg.Version)
+	// Construct our REST client using gh CLI's approach
+	httpClient, err := ghapi.NewHTTPClient(ghapi.HTTPClientOptions{
+		AppVersion:  cfg.Version,
+		Token:       cfg.Token,
+		EnableCache: true,
+		CacheTTL:    time.Hour,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	restClient := gogithub.NewClient(httpClient)
 	restClient.BaseURL = apiHost.baseRESTURL
 	restClient.UploadURL = apiHost.uploadURL
 
-	// Construct our GraphQL client
-	// We're using NewEnterpriseClient here unconditionally as opposed to NewClient because we already
-	// did the necessary API host parsing so that github.com will return the correct URL anyway.
-	gqlHTTPClient := &http.Client{
-		Transport: &bearerAuthTransport{
-			transport: http.DefaultTransport,
-			token:     cfg.Token,
-		},
-	} // We're going to wrap the Transport later in beforeInit
+	// Construct our GraphQL client using gh CLI's authentication approach
+	gqlHTTPClient, err := ghapi.NewHTTPClient(ghapi.HTTPClientOptions{
+		AppVersion:  cfg.Version,
+		Token:       cfg.Token,
+		EnableCache: true,
+		CacheTTL:    time.Hour,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GraphQL HTTP client: %w", err)
+	}
 	gqlClient := githubv4.NewEnterpriseClient(apiHost.graphqlURL.String(), gqlHTTPClient)
 
 	// When a client send an initialize request, update the user agent to include the client info.
@@ -86,7 +98,11 @@ func NewMCPServer(cfg MCPServerConfig) (*server.MCPServer, error) {
 			message.Params.ClientInfo.Version,
 		)
 
-		restClient.UserAgent = userAgent
+		// Update user agent for both REST and GraphQL clients
+		httpClient.Transport = &userAgentTransport{
+			transport: httpClient.Transport,
+			agent:     userAgent,
+		}
 
 		gqlHTTPClient.Transport = &userAgentTransport{
 			transport: gqlHTTPClient.Transport,
@@ -411,13 +427,3 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 	return t.transport.RoundTrip(req)
 }
 
-type bearerAuthTransport struct {
-	transport http.RoundTripper
-	token     string
-}
-
-func (t *bearerAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = req.Clone(req.Context())
-	req.Header.Set("Authorization", "Bearer "+t.token)
-	return t.transport.RoundTrip(req)
-}
