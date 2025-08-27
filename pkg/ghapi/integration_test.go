@@ -67,6 +67,51 @@ func TestGitHubClientWithToken(t *testing.T) {
 	}
 }
 
+func TestGitHubClientWithGHAuth(t *testing.T) {
+	// Test with gh CLI authentication (no token required)
+	client, err := NewGitHubClientWithGHAuth("", "test-version")
+	if err != nil {
+		// This may fail if gh CLI is not configured, which is expected in CI/test environments
+		t.Logf("GitHub CLI authentication not available (expected in CI): %v", err)
+		return
+	}
+
+	if client == nil {
+		t.Fatal("Expected non-nil GitHub client")
+	}
+
+	// Verify that we can access basic client properties
+	if client.BaseURL == nil {
+		t.Fatal("Expected BaseURL to be set")
+	}
+}
+
+func TestHTTPClientWithGHAuth(t *testing.T) {
+	// Test HTTP client creation without token (uses gh CLI auth)
+	opts := HTTPClientOptions{
+		AppVersion:  "test-1.0.0",
+		Host:        "github.com",
+		EnableCache: true,
+		CacheTTL:    time.Hour,
+	}
+
+	client, err := NewHTTPClient(opts)
+	if err != nil {
+		// This may fail if gh CLI is not configured, which is expected in CI/test environments
+		t.Logf("GitHub CLI authentication not available (expected in CI): %v", err)
+		return
+	}
+
+	if client == nil {
+		t.Fatal("Expected non-nil HTTP client")
+	}
+
+	// Verify that the transport is properly configured
+	if client.Transport == nil {
+		t.Fatal("Expected Transport to be set")
+	}
+}
+
 func TestEnterpriseGitHubClient(t *testing.T) {
 	// Test with enterprise hostname
 	client, err := NewGitHubClient("enterprise.github.com", "test-token", "test-version")

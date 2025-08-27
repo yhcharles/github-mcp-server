@@ -78,12 +78,55 @@ The modified server maintains full backward compatibility with the existing MCP 
 
 ## Usage
 
-The server configuration remains the same. Users provide:
+### Automatic Authentication (Recommended)
+
+The server now supports GitHub CLI's automatic authentication. Users can simply run:
+
+```bash
+gh auth login
+```
+
+Then configure the server **without** providing a token:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "github-mcp-server",
+      "args": ["--host", "github.com"]
+    }
+  }
+}
+```
+
+### Manual Token (Legacy Support)
+
+The server still supports manual token configuration for backwards compatibility:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "github-mcp-server",
+      "env": {
+        "GITHUB_TOKEN": "your-token",
+        "GITHUB_HOST": "github.com"
+      }
+    }
+  }
+}
+```
+
+### Configuration Options
+
 - `Host`: GitHub hostname (github.com, enterprise.github.com, etc.)
-- `Token`: GitHub personal access token or GitHub App token
+- `Token`: GitHub personal access token (optional - uses gh CLI auth if empty)
 - `Version`: Server version for user agent strings
 
 The new implementation automatically handles:
+- Automatic token resolution from gh CLI configuration
+- Environment variable and config file token lookup
+- System keyring integration for secure token storage
 - Proper API endpoint discovery
 - Authentication header formatting
 - Caching and performance optimization

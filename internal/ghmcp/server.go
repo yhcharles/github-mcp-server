@@ -33,7 +33,8 @@ type MCPServerConfig struct {
 	// GitHub Host to target for API requests (e.g. github.com or github.enterprise.com)
 	Host string
 
-	// GitHub Token to authenticate with the GitHub API
+	// GitHub Token to authenticate with the GitHub API (optional)
+	// If empty, will use gh CLI's automatic authentication (recommended)
 	Token string
 
 	// EnabledToolsets is a list of toolsets to enable
@@ -65,7 +66,8 @@ func NewMCPServer(cfg MCPServerConfig) (*server.MCPServer, error) {
 	// Construct our REST client using gh CLI's approach
 	httpClient, err := ghapi.NewHTTPClient(ghapi.HTTPClientOptions{
 		AppVersion:  cfg.Version,
-		Token:       cfg.Token,
+		Token:       cfg.Token, // Optional: uses gh CLI auth if empty
+		Host:        cfg.Host,
 		EnableCache: true,
 		CacheTTL:    time.Hour,
 	})
@@ -80,7 +82,8 @@ func NewMCPServer(cfg MCPServerConfig) (*server.MCPServer, error) {
 	// Construct our GraphQL client using gh CLI's authentication approach
 	gqlHTTPClient, err := ghapi.NewHTTPClient(ghapi.HTTPClientOptions{
 		AppVersion:  cfg.Version,
-		Token:       cfg.Token,
+		Token:       cfg.Token, // Optional: uses gh CLI auth if empty
+		Host:        cfg.Host,
 		EnableCache: true,
 		CacheTTL:    time.Hour,
 	})
@@ -176,7 +179,8 @@ type StdioServerConfig struct {
 	// GitHub Host to target for API requests (e.g. github.com or github.enterprise.com)
 	Host string
 
-	// GitHub Token to authenticate with the GitHub API
+	// GitHub Token to authenticate with the GitHub API (optional)
+	// If empty, will use gh CLI's automatic authentication (recommended)
 	Token string
 
 	// EnabledToolsets is a list of toolsets to enable

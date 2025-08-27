@@ -17,7 +17,8 @@ type tokenGetter interface {
 // HTTPClientOptions mirrors gh CLI's HTTPClientOptions but with simplified config handling
 type HTTPClientOptions struct {
 	AppVersion     string
-	Token          string
+	Token          string // Optional: if empty, will use gh CLI's automatic token resolution
+	Host           string // GitHub hostname for token resolution
 	CacheTTL       time.Duration
 	EnableCache    bool
 	Log            io.Writer
@@ -26,12 +27,26 @@ type HTTPClientOptions struct {
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
-	// Provide invalid host, and token values so gh.HTTPClient will not automatically resolve them.
-	// The real host and token are inserted at request time.
-	clientOpts := ghAPI.ClientOptions{
-		Host:         "none",
-		AuthToken:    "none",
-		LogIgnoreEnv: true,
+	var clientOpts ghAPI.ClientOptions
+
+	if opts.Token != "" {
+		// Use provided token (legacy mode)
+		clientOpts = ghAPI.ClientOptions{
+			Host:         "none",
+			AuthToken:    "none",
+			LogIgnoreEnv: true,
+		}
+	} else {
+		// Use gh CLI's automatic authentication
+		hostname := opts.Host
+		if hostname == "" {
+			hostname = "github.com"
+		}
+		clientOpts = ghAPI.ClientOptions{
+			Host:         hostname,
+			AuthToken:    "", // Let gh CLI resolve automatically
+			LogIgnoreEnv: false,
+		}
 	}
 
 	if opts.LogVerboseHTTP {
@@ -55,6 +70,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
+	// Only add custom token handling if a specific token was provided
 	if opts.Token != "" {
 		client.Transport = AddAuthTokenHeaderWithToken(client.Transport, opts.Token)
 	}

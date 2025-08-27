@@ -279,7 +279,8 @@ func NewGitHubClient(hostname, token, version string) (*github.Client, error) {
 	// Create HTTP client using gh CLI's approach
 	httpClient, err := NewHTTPClient(HTTPClientOptions{
 		AppVersion:  version,
-		Token:       token,
+		Token:       token, // Optional: if empty, uses gh CLI's automatic auth
+		Host:        hostname,
 		EnableCache: true,
 	})
 	if err != nil {
@@ -298,4 +299,10 @@ func NewGitHubClient(hostname, token, version string) (*github.Client, error) {
 	}
 
 	return client, nil
+}
+
+// NewGitHubClientWithGHAuth creates a new GitHub client that uses gh CLI's authentication
+// automatically, without requiring a token parameter
+func NewGitHubClientWithGHAuth(hostname, version string) (*github.Client, error) {
+	return NewGitHubClient(hostname, "", version)
 }
